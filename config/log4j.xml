@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<!DOCTYPE log4j:configuration SYSTEM "log4j.dtd">
+<log4j:configuration debug="true" xmlns:log4j='http://jakarta.apache.org/log4j/'>
+
+    <appender name="SEMISHAGOFF" class="org.apache.log4j.RollingFileAppender">
+        <param name="File" value="./logs/common.log"/>
+        <param name="maxBackupIndex" value="10"/>
+        <layout class="org.apache.log4j.PatternLayout">
+            <param name="ConversionPattern" value="[%d][%-5p][%-80m][%-10c{1}]%n"/>
+        </layout>
+    </appender>
+
+    <appender name="GUI" class="org.apache.log4j.RollingFileAppender">
+        <param name="File" value="./logs/gui.log"/>
+        <param name="maxBackupIndex" value="10"/>
+        <layout class="org.apache.log4j.PatternLayout">
+            <param name="ConversionPattern" value="[%d][%-5p][%-80m][%-10c{1}]%n"/>
+        </layout>
+    </appender>
+
+    <appender name="SECURITY" class="org.apache.log4j.RollingFileAppender">
+        <param name="File" value="./logs/security.log"/>
+        <param name="maxBackupIndex" value="10"/>
+        <layout class="org.apache.log4j.PatternLayout">
+            <param name="ConversionPattern" value="[%d][%-5p][%-80m][%-10c{1}]%n"/>
+        </layout>
+    </appender>
+
+    <appender name="UTILS" class="org.apache.log4j.RollingFileAppender">
+        <param name="File" value="./logs/utils.log"/>
+        <param name="maxBackupIndex" value="10"/>
+        <layout class="org.apache.log4j.PatternLayout">
+            <param name="ConversionPattern" value="[%d][%-5p][%-80m][%-10c{1}]%n"/>
+        </layout>
+    </appender>
+
+    <logger name="org.semishagoff">
+        <level value="INFO"/>
+        <appender-ref ref="SEMISHAGOFF"/>
+    </logger>
+
+    <logger name="org.semishagoff.barcode.gui">
+        <level value="INFO"/>
+        <appender-ref ref="GUI"/>
+    </logger>
+
+    <logger name="org.semishagoff.security">
+        <level value="INFO"/>
+        <appender-ref ref="SECURITY"/>
+    </logger>
+
+    <logger name="org.semishagoff.utils">
+        <level value="INFO"/>
+        <appender-ref ref="UTILS"/>
+    </logger>
+
+    <root>
+        <level value="INFO"/>
+    </root>
+
+</log4j:configuration>

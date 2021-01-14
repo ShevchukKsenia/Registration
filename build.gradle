@@ -1,0 +1,49 @@
+println "Build OS: " + System.getProperty("os.name")
+
+repositories {
+    mavenCentral()
+}
+
+apply plugin: 'java'
+apply plugin: 'application'
+
+version '1.0.0'
+
+[compileJava]*.options*.encoding = 'UTF-8'
+
+configurations {
+    implementation
+}
+
+dependencies {
+    implementation(
+//            [group: 'org.slf4j', name: 'slf4j-api', version: project.ext.slf4jVersion],
+//            [group: 'org.slf4j', name: 'jcl-over-slf4j', version: project.ext.slf4jVersion],
+//            [group: 'org.slf4j', name: 'jul-to-slf4j', version: project.ext.slf4jVersion],
+
+// Apache commons
+//            [group: 'commons-cli', name: 'commons-cli', version: '1.4'],
+            [group: 'org.apache.commons', name: 'commons-lang3', version: '3.9'],
+//            [group: 'commons-io', name: 'commons-io', version: '2.6'],
+            [group: 'org.apache.poi', name: 'poi-ooxml', version: '4.1.0'],
+            [group: 'org.apache.poi', name: 'poi', version: '4.1.0'],
+            [group: 'com.toedter', name: 'jcalendar', version: '1.4'],
+            [group: 'joda-time', name: 'joda-time', version: '2.5'],
+    )
+}
+/**
+ * ================ Common tasks ================
+ **/
+startScripts {
+    mainClassName = 'org.xenia.registration.App'
+    windowsStartScriptGenerator.template = resources.text.fromFile('./env/windowsStartScript.txt')
+}
+
+applicationDistribution.from('./config') {
+    into 'config'
+}
+
+compileJava {
+    targetCompatibility = '1.8'
+    sourceCompatibility = '1.8'
+}
