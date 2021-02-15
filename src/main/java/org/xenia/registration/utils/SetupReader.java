@@ -6,15 +6,15 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Vector;
 
 public class SetupReader {
   private static Workbook wb;
   private static FormulaEvaluator evaluator;
   private static SetupReader instance = null;
-  private static Map<String, Map<String, Map<String, String>>> allMaps;
+  private static Map<String, Vector<Map<String, String>>> allMaps;
 
-  private SetupReader() {
-  }
+  private SetupReader() { }
 
   public static SetupReader getInstance(String fileName) {
     if (instance == null) load(fileName);
@@ -30,7 +30,7 @@ public class SetupReader {
       evaluator = wb.getCreationHelper().createFormulaEvaluator();
       for (int iSheet = 0; iSheet < wb.getNumberOfSheets(); iSheet++) {
         String sheetName = wb.getSheetName(iSheet);
-        Map<String, Map<String, String>> sheetMap = createMaps(sheetName);
+        Vector<Map<String, String>> sheetMap = createMaps(sheetName);
         allMaps.put(sheetName, sheetMap);
       }
     } catch (Exception e) {
@@ -38,25 +38,25 @@ public class SetupReader {
     }
   }
 
-  public Map<String, Map<String, String>> getMap(String key) { return allMaps.get(key); }
+  public Vector<Map<String, String>> getMaps(String key) { return allMaps.get(key); }
 
   @SuppressWarnings("unchecked")
-  private static Map<String, Map<String, String>> createMaps(String sheetName) throws Exception {
-    Map<String, Map<String, String>> maps = new HashMap<>();
+  private static Vector<Map<String, String>> createMaps(String sheetName) throws Exception {
+    Vector<Map<String, String>> maps = new Vector<>();
     Sheet sheet = wb.getSheet(sheetName);
     Row header = sheet.getRow(0);
     for (int iRow = 1; iRow <= sheet.getLastRowNum(); iRow++) {
       Row row = sheet.getRow(iRow);
       String tabKey = getString(row.getCell(0));
       Map<String, String> data = new HashMap<>();
-      for (int iCell = 1; iCell <= row.getLastCellNum(); iCell++) {
+      for (int iCell = 0; iCell <= row.getLastCellNum(); iCell++) {
         Cell cell = header.getCell(iCell);
         if (cell != null && header.getCell(iCell) != null) {
           String rowKey = getString(header.getCell(iCell));
           data.put(rowKey, (row.getCell(iCell) == null ? "" : getString(row.getCell(iCell))));
         }
       }
-      maps.put(tabKey, data);
+      maps.add(data);
     }
     return maps;
   }

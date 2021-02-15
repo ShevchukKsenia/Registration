@@ -1,5 +1,7 @@
 package org.xenia.registration.gui;
 
+import org.xenia.registration.App;
+
 import javax.swing.*;
 import java.awt.event.KeyEvent;
 import java.awt.event.MouseEvent;
@@ -57,7 +59,10 @@ public class BaseJButton extends JButton {
     } else if (actionThread.getState().equals(Thread.State.TERMINATED)) {
       actionThread.run();
     } else {
-      MessageDialog.showInfo(null, "Process is still running", "Warning");
+      String text = App.configReader.getProperty("actionInProgressText", "Action still in progress");
+      String header = App.configReader.getProperty("actionInProgressHeader", "Warning");
+      MessageDialog.showInfo(null, text, header
+      );
     }
   };
 }

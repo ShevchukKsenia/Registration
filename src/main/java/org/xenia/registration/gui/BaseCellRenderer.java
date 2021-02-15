@@ -28,12 +28,12 @@ public class BaseCellRenderer extends DefaultTableCellRenderer {
 
     String toolTip = null;
     if (columnName.endsWith(".id")) {
-      toolTip = App.mainWindow.getRowName(columnName.replace(".id", ""), (Integer)value);
+      toolTip = App.mainWindow.getRowName(columnName.split("\\.")[0], (Integer)value);
       int statusId = 0;
       if (columnName.equals("status.id")) {
         statusId = ((Integer)value).intValue();
       } else {
-        statusId = App.mainWindow.getStatusId(columnName.replace(".id", ""), (Integer)value);
+        statusId = App.mainWindow.getStatusId(columnName.split("\\.")[0], (Integer)value);
       }
       setBackground(isSelected ? table.getSelectionBackground() : statusId == 0 ? table.getBackground() : Color.pink);
     }

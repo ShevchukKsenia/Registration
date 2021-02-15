@@ -34,6 +34,7 @@ public class InstanceEditDialog extends JDialog {
   protected boolean onlyView;
   protected Border invisibleBorder, normalBorder, focusBorder;
   protected Map<Integer, BaseComboBox> possibleIds = new HashMap<>();
+  protected Vector<Integer> fieldColumns, fieldRows;
 
   GridBagConstraints constraints;
 
@@ -54,18 +55,24 @@ public class InstanceEditDialog extends JDialog {
         onlyView = true;
       }
       for (int iField = 0; iField < nField; iField++) {
-        String key = formFields.get(iField).get("col");
+        Map<String, String> formField = formFields.elementAt(iField);
+        String key = formField.get("col");
         if (key.endsWith(".id")) {
           Integer selectedId = 0;
+          Vector<BaseComboBoxItem> ids = App.mainWindow.getIds(key.split("\\.")[0]);
           if (!isNew) {
             selectedId = (Integer) table.getValueAt(table.getSelectedRow(), iField);
+            try {
+              BaseComboBoxItem selectedItem = ids.elementAt(selectedId);
+            } catch (Exception e) {
+              selectedId = null;
+            }
             selectedId = selectedId == null ? 0 : selectedId;
           }
-          Vector<BaseComboBoxItem> ids = App.mainWindow.getIds(key.replace(".id", ""));
           BaseComboBox idsComboBox = new BaseComboBox(ids);
           idsComboBox.setRenderer(new BaseComboBoxRenderer());
           idsComboBox.setSelectedIndex(selectedId);
-          idsComboBox.setEnabled(!onlyView);
+          idsComboBox.setEnabled(!onlyView && baseTab.editableColumns.contains(Integer.valueOf(iField)));
           possibleIds.put(Integer.valueOf(iField), idsComboBox);
         }
         if (isNew) {
@@ -105,7 +112,10 @@ public class InstanceEditDialog extends JDialog {
           super.componentResized(e);
         }
       });
-      setTitle((onlyView ? "View" : isNew ? "Create" : "Edit") + " of record");
+      String titleText = onlyView ? App.configReader.getProperty("formViewHeader", "Record View") :
+        isNew ? App.configReader.getProperty("formAddHeader", "Record Create") :
+          App.configReader.getProperty("formEditHeader", "Record Edit");
+      setTitle(titleText);
     } catch (Exception e) {
     }
   }
@@ -131,8 +141,11 @@ public class InstanceEditDialog extends JDialog {
 
   private void createControlPanel() {
     controlPane = new JPanel();
-    okButton = new JButton((String) UIManager.get("OptionPane.yesButtonText"));
-    okButton.setToolTipText("Save results of " + (isNew ? "input" : "edit"));
+    String okButtonText = App.configReader.getProperty("saveButtonText", "Save");
+    okButton = new JButton(okButtonText);
+    String okButtonToolTip = isNew ? App.configReader.getProperty("saveNewToolTip", "Save Input Results") :
+      App.configReader.getProperty("saveEditToolTip", "Save Edit Results");
+    okButton.setToolTipText(okButtonToolTip);
     okButton.addActionListener(new ActionListener() {
       @Override
       public void actionPerformed(ActionEvent e) {
@@ -146,8 +159,12 @@ public class InstanceEditDialog extends JDialog {
         dispose();
       }
     });
-    cancelButton = new JButton((String) UIManager.get("OptionPane.cancelButtonText"));
-    cancelButton.setToolTipText(onlyView ? "Close form" : "Don't save results of " + (isNew ? "input" : "edit"));
+    String cancelButtonText = App.configReader.getProperty("cancelButtonText", "Cancel");
+    cancelButton = new JButton(cancelButtonText);
+    String cancelButtonToolTip = onlyView ? App.configReader.getProperty("cancelViewToolTip", "Close Form") :
+      isNew ? App.configReader.getProperty("cancelNewToolTip", "Don't Save Input Results") :
+        App.configReader.getProperty("cancelEditToolTip", "Don't Save Edit Results");
+    cancelButton.setToolTipText(cancelButtonToolTip);
     cancelButton.addActionListener(e -> {
       values = null;
       dispose();
@@ -176,11 +193,13 @@ public class InstanceEditDialog extends JDialog {
       final int finalIField = iField;
       Map<String, String> formField = formFields.elementAt(iField);
       String key = formField.get("col");
+      Integer fieldColumn = Integer.valueOf(formField.get("column"));
+      Integer fieldRow = Integer.valueOf(formField.get("row"));
       JLabel label = new JLabel(formField.get("name"));
       label.setToolTipText(formField.get("description"));
-      constraints.gridx = 0;
       constraints.weightx = 0;
-      constraints.gridy++;
+      constraints.gridx = fieldColumn.intValue() * 2;
+      constraints.gridy = fieldRow.intValue();
       mainPane.add(label, constraints);
       labels.add(label);
 
@@ -192,7 +211,7 @@ public class InstanceEditDialog extends JDialog {
         BorderFactory.createEmptyBorder(0, 2, 0, 2)) : focusBorder;
       field.setBorder(normalBorder);
       label.setBorder(invisibleBorder);
-      field.setEditable(!onlyView && !formField.get("col").equals("id"));
+      field.setEditable(!onlyView && !formField.get("col").equals("id") && baseTab.editableColumns.contains(Integer.valueOf(iField)));
       if (field.isEditable()) {
         firstFocusedField = firstFocusedField == null ? field : firstFocusedField;
         normalBackground = normalBackground == null ? field.getBackground() : normalBackground;
@@ -259,7 +278,7 @@ public class InstanceEditDialog extends JDialog {
         }
       });
       constraints.weightx = 1;
-      constraints.gridx = 1;
+      constraints.gridx = fieldColumn.intValue() * 2 + 1;
       if (key.endsWith(".id")) {
         mainPane.add(possibleIds.get(Integer.valueOf(iField)), constraints);
       } else {

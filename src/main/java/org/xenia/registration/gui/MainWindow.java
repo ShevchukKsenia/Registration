@@ -1,7 +1,6 @@
 package org.xenia.registration.gui;
 
 import org.apache.poi.ss.usermodel.*;
-import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.xenia.registration.App;
 import org.xenia.registration.utils.Utils;
 
@@ -12,7 +11,6 @@ import java.awt.event.WindowEvent;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
-import java.lang.reflect.Method;
 import java.net.URL;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
@@ -54,17 +52,26 @@ public class MainWindow extends JFrame {
       }
     } catch (Exception e) {
     }
+    java.util.Enumeration keys = UIManager.getDefaults().keys();
+    while (keys.hasMoreElements()) {
+      Object key = keys.nextElement();
+      Object value = UIManager.get(key);
+      if (value instanceof javax.swing.plaf.FontUIResource) {
+        javax.swing.plaf.FontUIResource fontUIResource = (javax.swing.plaf.FontUIResource) value;
+        UIManager.put(key, new javax.swing.plaf.FontUIResource(fontUIResource.getName()/*"Segoe UI"*/, fontUIResource.getStyle(), fontUIResource.getSize() + 1));
+      }
+    }
   }
 
   public void init() {
-//    UIManager.put("OptionPane.yesButtonText", "Ja");
-//    UIManager.put("OptionPane.noButtonText", "Nei");
-//    UIManager.put("OptionPane.cancelButtonText", "Avbryt");
-//    UIManager.put("FileChooser.approveButtonText", "Velg");
-//    UIManager.put("FileChooser.cancelButtonText", "Avbryt");
-    setTitle(App.configReader.getProperty("mainHeader", "Treatments registration system"));
-    int heightPercent = Integer.parseInt(App.configReader.getProperty("heightPercent", "50"));
-    int widthPercent = Integer.parseInt(App.configReader.getProperty("widthPercent", "50"));
+    UIManager.put("OptionPane.yesButtonText", App.configReader.getProperty("yesButtonText", "Yes"));
+    UIManager.put("OptionPane.noButtonText", App.configReader.getProperty("noButtonText", "No"));
+    UIManager.put("OptionPane.cancelButtonText", App.configReader.getProperty("cancelButtonText", "Cancel"));
+    UIManager.put("FileChooser.approveButtonText", App.configReader.getProperty("approveButtonText", "Ready"));
+    UIManager.put("FileChooser.cancelButtonText", App.configReader.getProperty("cancelButtonText", "Cancel"));
+    setTitle(App.configReader.getProperty("mainHeader", "Framework for Simple Data"));
+    double heightPercent = Double.parseDouble(App.configReader.getProperty("heightPercent", "50"));
+    double widthPercent = Double.parseDouble(App.configReader.getProperty("widthPercent", "50"));
     Dimension dim = new Dimension(Toolkit.getDefaultToolkit().getScreenSize());
     dim.setSize(dim.getWidth() * widthPercent / 100, dim.getHeight() * heightPercent / 100);
     setPreferredSize(dim);
@@ -82,21 +89,27 @@ public class MainWindow extends JFrame {
   private void createTabbedPane() throws Exception{
     tabbedPane = new JTabbedPane();
     ClassLoader classLoader = getClass().getClassLoader();
-    Map<String, Map<String, String>> items = App.setupReader.getMap("Tab");
-    Vector<String> tabKeys = Utils.getSortedKeys(items);
+    Vector<Map<String, String>> items = App.setupReader.getMaps("Tab");
+    Vector<Integer> tabNums = Utils.getSortedNums(items);
     int iTab = 0;
-    for (String tabKey : tabKeys) {
-      Map<String, String> tabData = items.get(tabKey);
+    for (Integer tabNum : tabNums) {
+      Map<String, String> tabData = items.get((int)tabNum);
+      String tabKey = tabData.get("key");
       Boolean filter = Boolean.parseBoolean(tabData.get("filter"));
-      BaseTab tab = new BaseTab(tabKey, filter.booleanValue());
+      Boolean visible = Boolean.parseBoolean(tabData.get("visible"));
+      Boolean addable = Boolean.parseBoolean(tabData.get("addable"));
+      Boolean deletable = Boolean.parseBoolean(tabData.get("deletable"));
+      BaseTab tab = new BaseTab(tabKey, filter.booleanValue(), visible.booleanValue(), addable.booleanValue(), deletable.booleanValue());
       String tabName = tabData.get("name");
       tab.baseName = tabName;
       String tabDescription = tabData.get("description");
       URL imageUrl = classLoader.getResource(tabData.get("icon"));
       ImageIcon icon = (imageUrl == null) ? null : new ImageIcon(imageUrl);
-      tabbedPane.insertTab(tabName, icon, tab, tabDescription, iTab);
+      if (tab.isVisible) {
+        tabbedPane.insertTab(tabName, icon, tab, tabDescription, iTab);
+        iTab++;
+      }
       tabs.put(tabKey, tab);
-      iTab++;
     }
   }
 
@@ -123,7 +136,9 @@ public class MainWindow extends JFrame {
   }
 
   public boolean dataSave() {
-    boolean toSave = MessageDialog.showConfirm(null, "Do you want to save data?", "Data saving");
+    String query = App.configReader.getProperty("saveDataQueryText", "Do you want to save data?");
+    String header = App.configReader.getProperty("saveDataQueryHeader", "Data Saving");
+    boolean toSave = MessageDialog.showConfirm(null, query, header);
     if (!toSave) {
       return true;
     }
@@ -140,14 +155,20 @@ public class MainWindow extends JFrame {
         wb.write(fileOut);
         fileOut.close();
         fileIn.close();
-        Vector<String> tabKeys = Utils.getSortedKeys(App.setupReader.getMap("Tab"));
+        Vector<String> tabKeys = Utils.getSortedKeys(App.setupReader.getMaps("Tab"));
         for (int iSheet = 0; iSheet < wb.getNumberOfSheets(); iSheet++) {
           Sheet sheet = wb.getSheetAt(iSheet);
           String sheetName = sheet.getSheetName();
-          if (tabKeys.contains(sheetName)) {
-            BaseTab tab = tabs.get(sheetName);
+          BaseTab tab = tabs.get(sheetName);
+          if (tabKeys.contains(sheetName) && tab.isVisible) {
+            CellStyle[] style = new CellStyle[sheet.getRow(0).getLastCellNum()];
             for (int iRow = sheet.getLastRowNum(); iRow > 0 ; iRow --) {
               Row row = sheet.getRow(iRow);
+              if (iRow == sheet.getLastRowNum()) {
+                for (int iCell = 0; iCell < row.getLastCellNum(); iCell++) {
+                  style[iCell] = row.getCell(iCell).getCellStyle();
+                }
+              }
               sheet.removeRow(row);
             }
             for (int iRow = 0; iRow < tab.getTable().getModel().getRowCount(); iRow++) {
@@ -161,6 +182,7 @@ public class MainWindow extends JFrame {
                   } else {
                     cell.setCellValue(cellValue == null ? "" : cellValue.toString());
                   }
+                  cell.setCellStyle(style[iCol]);
                 } catch (Exception e) {
                 }
               }

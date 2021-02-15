@@ -10,18 +10,17 @@ public class App {
   public static ConfigReader configReader;
   public static SetupReader setupReader;
   public static MainWindow mainWindow;
-
+  private static String configFileName = "Settings.xls";
 
   public static void main(String[] args) throws Exception {
-    configReader = new ConfigReader();
-    setupReader = SetupReader.getInstance(configReader.getProperty("setupFile", "Settings.xls"));
+    configReader = ConfigReader.getInstance(configFileName);
+    setupReader = SetupReader.getInstance(configFileName);
     mainWindow = new MainWindow();
     mainWindow.setDefaultCloseOperation(mainWindow.EXIT_ON_CLOSE);
     mainWindow.pack();
     center(mainWindow);
     mainWindow.setColumnsWidth();
     mainWindow.setVisible(true);
-
   }
 
   public static void center(Component c) {

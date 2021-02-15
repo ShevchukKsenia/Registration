@@ -1,9 +1,7 @@
 package org.xenia.registration.utils;
 
-import org.xenia.registration.App;
 import org.xenia.registration.gui.BaseJTextField;
 
-import javax.swing.*;
 import java.lang.reflect.Method;
 import java.util.Arrays;
 import java.util.Map;
@@ -11,20 +9,28 @@ import java.util.Vector;
 
 public class Utils {
 
-  public static Vector<String> getSortedKeys(Map<String, Map<String, String>> map) {
+  public static Vector<String> getSortedKeys(Vector<Map<String, String>> maps) {
     Vector<String> vector = new Vector<>();
-    if (map != null && map.size() > 0) {
-      double[] numbers = new double[map.size()];
+    Vector<Integer> nums = getSortedNums(maps);
+    for (Integer num : nums) {
+      vector.add(maps.get((int)num).get("key"));
+    }
+    return vector;
+  }
+  public static Vector<Integer> getSortedNums(Vector<Map<String, String>> maps) {
+    Vector<Integer> vector = new Vector<>();
+    if (maps != null && maps.size() > 0) {
+      double[] numbers = new double[maps.size()];
       int iTmp = -1;
-      for (String key : map.keySet()) {
+      for (Map<String, String> map : maps) {
         iTmp++;
-        numbers[iTmp] = Double.valueOf(map.get(key).get("number")).doubleValue();
+        numbers[iTmp] = Double.valueOf(map.get("number")).doubleValue();
       }
       Arrays.sort(numbers);
       for (iTmp = 0; iTmp < numbers.length; iTmp++) {
-        for (String key : map.keySet()) {
-          if (Double.valueOf(map.get(key).get("number")).doubleValue() == numbers[iTmp] && !vector.contains(key)) {
-            vector.add(key);
+        for (Map<String, String> tmpMap : maps) {
+          if (Double.valueOf(tmpMap.get("number")).doubleValue() == numbers[iTmp] && !vector.contains(Integer.valueOf(iTmp))) {
+            vector.add(Integer.valueOf(iTmp));
             break;
           }
         }
@@ -33,11 +39,11 @@ public class Utils {
     return vector;
   }
 
-  public static Vector<String> getSortedKeys(Map<String, Map<String, String>> map, String tabKey) {
-    Vector<String> tmpVector = getSortedKeys(map);
-    Vector<String> vector = new Vector();
-    for (String key : tmpVector) {
-      if (key.startsWith(tabKey + ".")) vector.add(key);
+  public static Vector<Integer> getSortedNums(Vector<Map<String, String>> maps, String tabKey) {
+    Vector<Integer> tmpVector = getSortedNums(maps);
+    Vector<Integer> vector = new Vector();
+    for (Integer num : tmpVector) {
+      if (maps.get(num).get("key").startsWith(tabKey + ".")) vector.add(num);
     }
     return vector;
   }

@@ -34,17 +34,19 @@ public class BaseTab extends JPanel {
   protected int columnCount;
   protected String[] columnName, columnHead, columnToolTip;
   protected int[] columnWidth, columnAlignment;
+  public List<Integer> editableColumns;
   public static ConfigReader configReader;
   public static SetupReader setupReader;
   public MainWindow mainWindow;
   protected List<JButton> buttons;
-  protected boolean filter;
+  protected boolean hasFilter, isVisible, isAddable, isDeletable;
   protected boolean simpleRowCount;
 
   private JTable filterTable;
   private BaseTableModel filterTableModel;
   private JButton applyFilterButton;
   private TableRowSorter<TableModel> sorter;
+  private List<RowFilter<Object, Object>> filter;
 
   private JDialog editFrame;
   private BaseJTextField editField;
@@ -53,7 +55,8 @@ public class BaseTab extends JPanel {
 
   private JTable clickedTable;
   private JPanel menuPanel;
-  private JScrollPane scrollPane, filterPane;
+  private JScrollPane tablePane, filterTablePane;
+  protected JSplitPane splitTablePane;
   private int clickedRow;
   private int clickedCol;
   private BaseTab clickedTab;
@@ -74,9 +77,12 @@ public class BaseTab extends JPanel {
 
   protected Map<String, RowFilter.ComparisonType> matchMap;
 
-  public BaseTab(String tabClass, boolean filter) {
+  public BaseTab(String tabClass, boolean hasFilter, boolean isVisible, boolean isAddable, boolean isDeletable) {
     tabKey = tabClass;
-    this.filter = filter;
+    this.hasFilter = hasFilter;
+    this.isVisible = isVisible;
+    this.isAddable = isAddable;
+    this.isDeletable = isDeletable;
     swingConstants = new SwingConstants() {
       @Override
       public int hashCode() {
@@ -100,10 +106,11 @@ public class BaseTab extends JPanel {
   }
 
   private void initTable() throws Exception {
-    Map<String, Map<String, String>> items = App.setupReader.getMap("Column");
-    Vector<String> colKeys = Utils.getSortedKeys(items, tabKey);
+    Vector<Map<String, String>> items = App.setupReader.getMaps("Column");
+    Vector<Integer> colNums = Utils.getSortedNums(items, tabKey);
     columns = new Vector<>();
-    columnCount = colKeys.size();
+    editableColumns = new ArrayList<>();
+    columnCount = colNums.size();
     lastCol = -1;
     idColumn = -1;
     nameColumn = -1;
@@ -114,8 +121,9 @@ public class BaseTab extends JPanel {
     columnWidth = new int[columnCount];
     columnAlignment = new int[columnCount];
     int iCol = 0;
-    for (String colKey : colKeys) {
-      Map<String, String> colData = items.get(colKey);
+    for (Integer colNum : colNums) {
+      Map<String, String> colData = items.get(colNum);
+      String colKey = colData.get("key");
       columnName[iCol] = colKey.replace(tabKey + ".", "");
       columnHead[iCol] = colData.get("name");
       columnToolTip[iCol] = colData.get("description");
@@ -126,6 +134,9 @@ public class BaseTab extends JPanel {
       idColumn = columnName[iCol].equals("id") && idColumn < 0 ? iCol : idColumn;
       nameColumn = columnName[iCol].equals("name") && nameColumn < 0 ? iCol : nameColumn;
       statusColumn = columnName[iCol].equals("status.id") && statusColumn < 0 ? iCol : statusColumn;
+      if (Boolean.parseBoolean(colData.get("editable"))) {
+        editableColumns.add(Integer.valueOf(iCol));
+      }
       iCol++;
     }
   }
@@ -135,30 +146,38 @@ public class BaseTab extends JPanel {
   }
 
   protected void createComponents() {
+    createMenuPanel();
+    createJScrollPane();
+    createFilterPane();
+    createTablePanel();
     setLayout(new GridBagLayout());
     GridBagConstraints c = new GridBagConstraints();
-    c.gridx = 1;
+    c.gridx = 0;
     c.gridy = 0;
     c.weightx = 1;
-    c.weighty = 0;
+    c.weighty = 0.0;
     c.fill = GridBagConstraints.BOTH;
-    createMenuPanel();
-    add(menuPanel, c);
-    c.gridx = 1;
-    c.gridy = filter ? 2 : 1;
-    c.weightx = 1;
-    c.weighty = 1;
-    createJScrollPane();
-    add(scrollPane, c);
-    c.gridx = 1;
-    c.gridy = 1;
-    c.weightx = 1;
-    c.weighty = 0;
-    createFilterPane();
-    if (filter) {
-      add(filterPane, c);
-      filterTable.setVisible(filter);
+    c.anchor = GridBagConstraints.NORTH;
+    if (menuPanel != null) {
+      add(menuPanel, c);
+      c.gridy++;
     }
+    c.weighty = 1;
+    add(splitTablePane, c);
+    addComponentListener(new ComponentAdapter() {
+      @Override
+      public void componentShown(ComponentEvent e) {
+        super.componentShown(e);
+        splitTablePane.setDividerLocation(table.getRowHeight() + 2);
+      }
+    });
+  }
+
+  protected void createTablePanel() {
+    splitTablePane = new JSplitPane(JSplitPane.VERTICAL_SPLIT, false);
+    splitTablePane.setDividerSize(0);
+    splitTablePane.setTopComponent(hasFilter ? filterTablePane : null);
+    splitTablePane.setBottomComponent(tablePane);
   }
 
   private void createMenuPanel() {
@@ -176,22 +195,16 @@ public class BaseTab extends JPanel {
     createPopup();
     table.setComponentPopupMenu(popupMenu);
     table.setAutoscrolls(false);
-    scrollPane = new JScrollPane(table, ScrollPaneConstants.VERTICAL_SCROLLBAR_ALWAYS, ScrollPaneConstants.HORIZONTAL_SCROLLBAR_AS_NEEDED);
+    tablePane = new JScrollPane(table, ScrollPaneConstants.VERTICAL_SCROLLBAR_ALWAYS, ScrollPaneConstants.HORIZONTAL_SCROLLBAR_AS_NEEDED);
     table.setAutoscrolls(true);
     table.setLayout(new FlowLayout(FlowLayout.TRAILING, -20, -25));
     table.getColumnModel().addColumnModelListener(new TableColumnModelListener() {
       @Override
-      public void columnAdded(TableColumnModelEvent e) {
-      }
-
+      public void columnAdded(TableColumnModelEvent e) { }
       @Override
-      public void columnRemoved(TableColumnModelEvent e) {
-      }
-
+      public void columnRemoved(TableColumnModelEvent e) { }
       @Override
-      public void columnMoved(TableColumnModelEvent e) {
-      }
-
+      public void columnMoved(TableColumnModelEvent e) { }
       @Override
       public void columnMarginChanged(ChangeEvent e) {
         if (filterTable != null) {
@@ -201,36 +214,29 @@ public class BaseTab extends JPanel {
         }
         table.requestFocus();
       }
-
       @Override
-      public void columnSelectionChanged(ListSelectionEvent e) {
-      }
+      public void columnSelectionChanged(ListSelectionEvent e) { }
     });
 
     URL imageUrl = getClass().getClassLoader().getResource("images/nosorted.gif");
     ImageIcon icon = imageUrl == null ? null : new ImageIcon(imageUrl);
     JButton noSortButton = new JButton("", icon);
-    noSortButton.setPreferredSize(scrollPane.getVerticalScrollBar().getPreferredSize());
-    noSortButton.setToolTipText("Default row sorting");
+    noSortButton.setPreferredSize(tablePane.getVerticalScrollBar().getPreferredSize());
+    noSortButton.setToolTipText(App.configReader.getProperty("noSortButtonToolTip", "Default Row Sorting"));
     noSortButton.addActionListener(new ActionListener() {
       @Override
-      public void actionPerformed(ActionEvent e) {
-        sorter.setSortKeys(null);
-      }
+      public void actionPerformed(ActionEvent e) { sorter.setSortKeys(null); }
     });
     noSortButton.setFocusable(false);
     noSortButton.setBorder(UIManager.getBorder("TableHeader.cellBorder"));
-    scrollPane.setCorner(JScrollPane.UPPER_RIGHT_CORNER, noSortButton);
+    tablePane.setCorner(JScrollPane.UPPER_RIGHT_CORNER, noSortButton);
   }
 
   private void createFilterPane() {
     createFilterTable();
-    filterPane = new JScrollPane(filterTable, ScrollPaneConstants.VERTICAL_SCROLLBAR_ALWAYS, ScrollPaneConstants.HORIZONTAL_SCROLLBAR_AS_NEEDED);
-    filterPane.getHorizontalScrollBar().setPreferredSize(new Dimension(table.getPreferredSize().width, 7));
-    filterPane.getHorizontalScrollBar().setBorder(null);
-    filterTable.setLayout(new FlowLayout(FlowLayout.TRAILING, -20, -25));
-    for (int i = filterPane.getVerticalScrollBar().getComponentCount() - 1; i >= 0; i--) {
-      filterPane.getVerticalScrollBar().remove(i);
+    filterTablePane = new JScrollPane(filterTable, ScrollPaneConstants.VERTICAL_SCROLLBAR_ALWAYS, ScrollPaneConstants.HORIZONTAL_SCROLLBAR_AS_NEEDED);
+    for (int i = filterTablePane.getVerticalScrollBar().getComponentCount() - 1; i >= 0; i--) {
+      filterTablePane.getVerticalScrollBar().remove(i);
     }
     matchMap = new HashMap<>();
     matchMap.put("<", RowFilter.ComparisonType.BEFORE);
@@ -240,14 +246,17 @@ public class BaseTab extends JPanel {
     URL imageUrl = getClass().getClassLoader().getResource("images/event.gif");
     ImageIcon icon = imageUrl == null ? null : new ImageIcon(imageUrl);
     applyFilterButton = new JButton("", icon);
-    applyFilterButton.setPreferredSize(filterPane.getVerticalScrollBar().getPreferredSize());
-    applyFilterButton.setToolTipText("Apply filter");
+    applyFilterButton.setPreferredSize(filterTablePane.getVerticalScrollBar().getPreferredSize());
+    applyFilterButton.setToolTipText(App.configReader.getProperty("applyFilterButtonToolTip", "Apply Filter"));
     applyFilterButton.setFocusable(false);
     applyFilterButton.addActionListener(new ActionListener() {
       public void actionPerformed(ActionEvent e) {
+        if (filterTable.getCellEditor() != null) {
+          filterTable.getCellEditor().stopCellEditing();
+        }
         boolean hasMask = (e.getModifiers() & KeyEvent.SHIFT_MASK) == KeyEvent.SHIFT_MASK;
         boolean filterEmpty = true;
-        List<RowFilter<Object, Object>> filter = new ArrayList<>();
+        filter = new ArrayList<>();
         for (int iCol = 0; iCol < filterTable.getColumnCount(); iCol++) {
           Object value = filterTable.getValueAt(0, iCol);
           if (value != null && value.toString().trim().length() > 0) {
@@ -278,8 +287,7 @@ public class BaseTab extends JPanel {
 //       mainWindow.updateStatus();
       }
     });
-
-    filterPane.getVerticalScrollBar().setLayout(new GridBagLayout());
+    filterTablePane.getVerticalScrollBar().setLayout(new GridBagLayout());
     GridBagConstraints c = new GridBagConstraints();
     c.insets = new Insets(0, 0, 0, 0);
     c.weightx = 1;
@@ -287,7 +295,7 @@ public class BaseTab extends JPanel {
     c.gridx = 0;
     c.gridy = 0;
     c.fill = GridBagConstraints.BOTH;
-    filterPane.getVerticalScrollBar().add(applyFilterButton, c);
+    filterTablePane.getVerticalScrollBar().add(applyFilterButton, c);
   }
 
   private void createTable() {
@@ -322,14 +330,14 @@ public class BaseTab extends JPanel {
     sorter = new TableRowSorter<TableModel>(tableModel);
     table.setRowSorter(sorter);
 
-    Map<String, Map<String, String>> data = setupReader.getMap(tabKey);
+    Vector<Map<String, String>> data = setupReader.getMaps(tabKey);
 
-    for (String key : data.keySet()) {
+    for (Map<String, String> dataMap : data) {
       Vector<Object> row = new Vector();
-      row.add(Integer.valueOf(key));
-      for (int iCol = 1; iCol < table.getColumnCount(); iCol++) {
-        String str = data.get(key).get(columnName[iCol]);
-        row.add(columnName[iCol].endsWith("id") ? Integer.valueOf(str) : str);
+      for (int iCol = 0; iCol < table.getColumnCount(); iCol++) {
+        String str = dataMap.get(columnName[iCol]);
+        str = str.trim().length() < 1 ? null : str;
+        row.add(columnName[iCol].endsWith("id") ? (str == null ? null : Integer.valueOf(str)) : str);
       }
       tableModel.addRow(row);
     }
@@ -369,7 +377,7 @@ public class BaseTab extends JPanel {
 
   private void editRowAction(boolean hasMask, boolean isNew) {
     String yesButtonText = (String) UIManager.get("OptionPane.yesButtonText");
-    UIManager.put("OptionPane.yesButtonText", "Save");
+    UIManager.put("OptionPane.yesButtonText", App.configReader.getProperty("saveButtonText", "Save"));
     Object[] fieldValues = InstanceEditDialog.showDialog(this, isNew, hasMask);
     if (fieldValues != null) {
       if (isNew) {
@@ -505,15 +513,21 @@ public class BaseTab extends JPanel {
     try {
       popupMenu = new BaseJPopupMenu();
       for (int i = 0; i < 4; i++) {
-        String buttonText = i == 0 ? "Add (<Ins>)" : i == 1 ? "View (<Enter>)" :
-          i == 2 ? "Edit (<Shift+Enter>)" : "Delete (<Del>)";
+        String buttonText = i == 0 ? App.configReader.getProperty("popupAddText", "Add (<Ins>)") :
+          i == 1 ? App.configReader.getProperty("popupViewText", "View (<Enter>)") :
+          i == 2 ? App.configReader.getProperty("popupEditText", "Edit (<Shift+Enter>)") :
+          i == 3 ? App.configReader.getProperty("popupDeleteText", "Delete (<Del>)") :
+          "";
         int rowCount = i == 0 ? -1 : i == 1 ? 1 : i == 2 ? 1 : 0;
         boolean hasDialog = i >= 3;
         String voidName = i == 0 ? "createRow" : i == 1 ? "viewRow" : i == 2 ? "editRow" : "deleteRows";
-        String dialogQuery = i < 3 ? "" : "Are you sure?";
-        String dialogHeader = i < 3 ? "" : "Deleting of " + table.getSelectedRowCount() + " lines";
+        String dialogQuery = i < 3 ? "" : App.configReader.getProperty("deleteQueryText", "Are You sure?");
+        String dialogHeader = i < 3 ? "" : App.configReader.getProperty("deleteQueryHeader_1", "Delete") + " " +
+          table.getSelectedRowCount() + " " + App.configReader.getProperty("deleteQueryHeader_2", "lines");
         BaseJMenuItem jMenuItem = new BaseJMenuItem(buttonText, rowCount, hasDialog, voidName, dialogQuery, dialogHeader, this);
-        popupMenu.add(jMenuItem);
+        if ((i == 0 && isAddable) || i == 1 || i == 2 || (i == 3 && isDeletable)) {
+          popupMenu.add(jMenuItem);
+        }
       }
     } catch (Exception e) {
     }

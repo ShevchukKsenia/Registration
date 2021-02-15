@@ -58,8 +58,8 @@ public class CalendarField extends JPanel {
         }
       }
     };
-    dateChooser.setLocale(new Locale(App.configReader.getProperty("guiLanguage", "ru"),
-      App.configReader.getProperty("guiCountry", "RU")));
+    dateChooser.setLocale(new Locale(App.configReader.getProperty("guiLanguage", "en"),
+      App.configReader.getProperty("guiCountry", "US")));
     dateChooser.setDateFormatString(datetimeFormat);
     dateChooser.setDate(initialTimestamp == null ? new Date() : new Date(initialTimestamp));
 
